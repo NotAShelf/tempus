@@ -54,8 +54,8 @@ enum ProgressBarTheme {
 #[command(name = "tempus", version = "1.0", about = "Minimalist timer for your terminal")]
 struct Args {
     /// Sleep duration (e.g. 5s, 2m, 1h30m)
-    #[arg(value_name = "DURATION")]
-    duration: String,
+    #[arg(value_name = "DURATION", required_unless_present = "preset")]
+    duration: Option<String>,
 
     /// Give this timer a name
     #[arg(short, long, default_value = "Timer")]
@@ -68,13 +68,35 @@ struct Args {
     /// Progress bar theme (gradient, rainbow, simple, pulse)
     #[arg(short, long, default_value = "gradient")]
     theme: String,
+
+    /// Use a preset duration (pomodoro, short-break, long-break, tea, coffee)
+    #[arg(short = 'p', long)]
+    preset: Option<String>,
+
+    /// Play bell sound when timer completes
+    #[arg(short = 'b', long, default_value_t = true)]
+    bell: bool,
+
+    /// Send a desktop notification when timer completes
+    #[arg(short = 'N', long, default_value_t = false)]
+    notify: bool,
 }
 
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    let duration = parse_duration(&args.duration)
-        .map_err(|_| TempusError::InvalidDuration(args.duration.clone()))?;
+    let duration_str = match args.preset.as_deref() {
+        Some("pomodoro") => "25m".to_string(),
+        Some("short-break") => "5m".to_string(),
+        Some("long-break") => "15m".to_string(),
+        Some("tea") => "3m".to_string(),
+        Some("coffee") => "4m".to_string(),
+        Some(custom) => custom.to_string(),
+        None => args.duration.clone().unwrap_or_default(),
+    };
+
+    let duration = parse_duration(&duration_str)
+        .map_err(|_| TempusError::InvalidDuration(duration_str))?;
 
     // Parse theme from string
     let theme = match args.theme.to_lowercase().as_str() {
@@ -84,7 +106,7 @@ fn main() -> Result<()> {
         _ => ProgressBarTheme::Gradient,
     };
 
-    run_timer(duration, &args.name, args.verbose, theme)?;
+    run_timer(duration, &args.name, args.verbose, theme, args.bell, args.notify)?;
 
     Ok(())
 }
@@ -104,7 +126,7 @@ fn format_simple_duration(duration: Duration) -> String {
     }
 }
 
-fn run_timer(duration: Duration, name: &str, verbose: bool, theme: ProgressBarTheme) -> Result<()> {
+fn run_timer(duration: Duration, name: &str, verbose: bool, theme: ProgressBarTheme, bell: bool, notify: bool) -> Result<()> {
     let total_millis = duration.as_millis() as f64;
     let start_time = Instant::now();
 
@@ -322,6 +344,10 @@ fn run_timer(duration: Duration, name: &str, verbose: bool, theme: ProgressBarTh
     // Timer complete
     let total_elapsed = start_time.elapsed();
 
+    // Play bell sound if enabled
+    if bell {
+        print!("\x07"); // bell character
+    }
 
     print!("\r\x1B[K");
 
@@ -343,5 +369,35 @@ fn run_timer(duration: Duration, name: &str, verbose: bool, theme: ProgressBarTh
         format_simple_duration(total_elapsed)
     );
 
+    // Send desktop notification if enabled
+    if notify {
+        send_notification(name, total_elapsed)?;
+    }
+
+    Ok(())
+}
+
+
+fn send_notification(name: &str, duration: Duration) -> Result<()> {
+    if cfg!(target_os = "linux") {
+        let _ = std::process::Command::new("notify-send")
+            .args([&format!("{} completed!", name), &format!("Duration: {}", format_simple_duration(duration))])
+            .spawn();
+    } else if cfg!(target_os = "macos") {
+        let _ = std::process::Command::new("osascript")
+            .args(["-e", &format!("display notification \"Duration: {}\" with title \"{}\"",
+                   format_simple_duration(duration), format!("{} completed!", name))])
+            .spawn();
+    } else if cfg!(target_os = "windows") {
+        let script = format!(
+            // Thank you Sky for the PS script. I wouldn't care about it otherwise.
+            "powershell -Command \"[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null; $template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02); $toastXml = [xml] $template.GetXml(); $toastXml.GetElementsByTagName('text')[0].AppendChild($toastXml.CreateTextNode('{} completed!')) > $null; $toastXml.GetElementsByTagName('text')[1].AppendChild($toastXml.CreateTextNode('Duration: {}')) > $null; $toast = [Windows.UI.Notifications.ToastNotification]::new($toastXml); [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('Tempus').Show($toast);\"",
+            name,
+            format_simple_duration(duration)
+        );
+        let _ = std::process::Command::new("cmd")
+            .args(["/C", &script])
+            .spawn();
+    }
     Ok(())
 }
