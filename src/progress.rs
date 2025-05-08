@@ -1,14 +1,14 @@
-use std::io::{stdout, Write};
+use crate::Result;
+use crate::utils::{format_simple_duration, send_notification, should_use_color};
+use std::io::{Write, stdout};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
-use crate::Result;
-use crate::utils::{format_simple_duration, send_notification};
 
 #[derive(Debug, Clone, Copy)]
 pub enum ProgressBarTheme {
     Gradient,
     Rainbow,
-    Simple,
+    Plain,
     Pulse,
 }
 
@@ -33,7 +33,19 @@ const COLOR_BRIGHT_WHITE: &str = "\x1B[97m";
 
 const STYLE_BOLD: &str = "\x1B[1m";
 
-pub fn run_timer(duration: Duration, name: &str, verbose: bool, theme: ProgressBarTheme, bell: bool, notify: bool) -> Result<()> {
+pub fn run_timer(
+    duration: Duration,
+    name: &str,
+    verbose: bool,
+    mut theme: ProgressBarTheme,
+    bell: bool,
+    notify: bool,
+) -> Result<()> {
+    // If NO_COLOR environment variable is set, override theme to Plain
+    if !should_use_color() {
+        theme = ProgressBarTheme::Plain;
+    }
+
     let total_millis = duration.as_millis() as f64;
     let start_time = Instant::now();
 
@@ -79,22 +91,32 @@ pub fn run_timer(duration: Duration, name: &str, verbose: bool, theme: ProgressB
 
         let spinner_color = match theme {
             ProgressBarTheme::Rainbow => {
-                let colors = [COLOR_RED, COLOR_YELLOW, COLOR_GREEN, COLOR_CYAN, COLOR_BLUE, COLOR_MAGENTA];
+                let colors = [
+                    COLOR_RED,
+                    COLOR_YELLOW,
+                    COLOR_GREEN,
+                    COLOR_CYAN,
+                    COLOR_BLUE,
+                    COLOR_MAGENTA,
+                ];
                 colors[(spinner_idx / 2) % colors.len()]
-            },
+            }
             ProgressBarTheme::Gradient => COLOR_CYAN,
-            ProgressBarTheme::Simple => COLOR_RESET,
+            ProgressBarTheme::Plain => COLOR_RESET,
             ProgressBarTheme::Pulse => {
                 let colors = [COLOR_CYAN, COLOR_BRIGHT_CYAN];
                 colors[spinner_idx % colors.len()]
-            },
+            }
         };
 
-        print!("{}{}{} ", spinner_color, SPINNER_CHARS[spinner_idx], COLOR_RESET);
+        print!(
+            "{}{}{} ",
+            spinner_color, SPINNER_CHARS[spinner_idx], COLOR_RESET
+        );
         spinner_idx = (spinner_idx + 1) % SPINNER_CHARS.len();
 
         match theme {
-            ProgressBarTheme::Simple => print!("{}", LEFT_BRACKET),
+            ProgressBarTheme::Plain => print!("{}", LEFT_BRACKET),
             _ => print!("{}", LEFT_BRACKET),
         }
 
@@ -113,15 +135,21 @@ pub fn run_timer(duration: Duration, name: &str, verbose: bool, theme: ProgressB
                         };
 
                         print!("{}{}{}", color, PROGRESS_CHARS[7], COLOR_RESET);
-                    } else if i == (progress_ratio * bar_width as f64) as usize && progress_ratio < 1.0 {
-                        let partial = (progress_ratio * bar_width as f64) - (progress_ratio * bar_width as f64).floor();
+                    } else if i == (progress_ratio * bar_width as f64) as usize
+                        && progress_ratio < 1.0
+                    {
+                        let partial = (progress_ratio * bar_width as f64)
+                            - (progress_ratio * bar_width as f64).floor();
                         let idx = (partial * (PROGRESS_CHARS.len() - 1) as f64).floor() as usize;
-                        print!("{}{}{}", COLOR_BRIGHT_GREEN, PROGRESS_CHARS[idx], COLOR_RESET);
+                        print!(
+                            "{}{}{}",
+                            COLOR_BRIGHT_GREEN, PROGRESS_CHARS[idx], COLOR_RESET
+                        );
                     } else {
                         print!("{}", PROGRESS_CHARS[8]);
                     }
                 }
-            },
+            }
             ProgressBarTheme::Rainbow => {
                 for i in 0..bar_width {
                     let position = i as f64 / bar_width as f64;
@@ -138,30 +166,39 @@ pub fn run_timer(duration: Duration, name: &str, verbose: bool, theme: ProgressB
                         };
 
                         print!("{}{}{}", color, PROGRESS_CHARS[7], COLOR_RESET);
-                    } else if i == (progress_ratio * bar_width as f64) as usize && progress_ratio < 1.0 {
-                        let partial = (progress_ratio * bar_width as f64) - (progress_ratio * bar_width as f64).floor();
+                    } else if i == (progress_ratio * bar_width as f64) as usize
+                        && progress_ratio < 1.0
+                    {
+                        let partial = (progress_ratio * bar_width as f64)
+                            - (progress_ratio * bar_width as f64).floor();
                         let idx = (partial * (PROGRESS_CHARS.len() - 1) as f64).floor() as usize;
-                        print!("{}{}{}", COLOR_BRIGHT_WHITE, PROGRESS_CHARS[idx], COLOR_RESET);
+                        print!(
+                            "{}{}{}",
+                            COLOR_BRIGHT_WHITE, PROGRESS_CHARS[idx], COLOR_RESET
+                        );
                     } else {
                         print!("{}", PROGRESS_CHARS[8]);
                     }
                 }
-            },
-            ProgressBarTheme::Simple => {
+            }
+            ProgressBarTheme::Plain => {
                 for i in 0..bar_width {
                     let position = i as f64 / bar_width as f64;
 
                     if position < progress_ratio {
                         print!("{}", PROGRESS_CHARS[7]);
-                    } else if i == (progress_ratio * bar_width as f64) as usize && progress_ratio < 1.0 {
-                        let partial = (progress_ratio * bar_width as f64) - (progress_ratio * bar_width as f64).floor();
+                    } else if i == (progress_ratio * bar_width as f64) as usize
+                        && progress_ratio < 1.0
+                    {
+                        let partial = (progress_ratio * bar_width as f64)
+                            - (progress_ratio * bar_width as f64).floor();
                         let idx = (partial * (PROGRESS_CHARS.len() - 1) as f64).floor() as usize;
                         print!("{}", PROGRESS_CHARS[idx]);
                     } else {
                         print!("{}", PROGRESS_CHARS[8]);
                     }
                 }
-            },
+            }
             ProgressBarTheme::Pulse => {
                 pulse_offset += pulse_speed;
                 if pulse_offset > 1.0 {
@@ -184,24 +221,30 @@ pub fn run_timer(duration: Duration, name: &str, verbose: bool, theme: ProgressB
                         };
 
                         print!("{}{}{}", color, PROGRESS_CHARS[7], COLOR_RESET);
-                    } else if i == (progress_ratio * bar_width as f64) as usize && progress_ratio < 1.0 {
-                        let partial = (progress_ratio * bar_width as f64) - (progress_ratio * bar_width as f64).floor();
+                    } else if i == (progress_ratio * bar_width as f64) as usize
+                        && progress_ratio < 1.0
+                    {
+                        let partial = (progress_ratio * bar_width as f64)
+                            - (progress_ratio * bar_width as f64).floor();
                         let idx = (partial * (PROGRESS_CHARS.len() - 1) as f64).floor() as usize;
-                        print!("{}{}{}", COLOR_BRIGHT_BLUE, PROGRESS_CHARS[idx], COLOR_RESET);
+                        print!(
+                            "{}{}{}",
+                            COLOR_BRIGHT_BLUE, PROGRESS_CHARS[idx], COLOR_RESET
+                        );
                     } else {
                         print!("{}", PROGRESS_CHARS[8]);
                     }
                 }
-            },
+            }
         }
 
         match theme {
-            ProgressBarTheme::Simple => print!("{}", RIGHT_BRACKET),
+            ProgressBarTheme::Plain => print!("{}", RIGHT_BRACKET),
             _ => print!("{}", RIGHT_BRACKET),
         }
 
         let percent_color = match theme {
-            ProgressBarTheme::Simple => COLOR_RESET,
+            ProgressBarTheme::Plain => COLOR_RESET,
             ProgressBarTheme::Gradient => {
                 if percent < 33.0 {
                     COLOR_GREEN
@@ -210,12 +253,15 @@ pub fn run_timer(duration: Duration, name: &str, verbose: bool, theme: ProgressB
                 } else {
                     COLOR_BRIGHT_RED
                 }
-            },
+            }
             ProgressBarTheme::Rainbow => COLOR_BRIGHT_WHITE,
             ProgressBarTheme::Pulse => COLOR_BRIGHT_CYAN,
         };
 
-        print!(" {}{}{:.1}%{}", STYLE_BOLD, percent_color, percent, COLOR_RESET);
+        print!(
+            " {}{}{:.1}%{}",
+            STYLE_BOLD, percent_color, percent, COLOR_RESET
+        );
 
         if verbose {
             let remaining = duration
@@ -223,7 +269,7 @@ pub fn run_timer(duration: Duration, name: &str, verbose: bool, theme: ProgressB
                 .unwrap_or(Duration::from_secs(0));
 
             let time_color = match theme {
-                ProgressBarTheme::Simple => COLOR_RESET,
+                ProgressBarTheme::Plain => COLOR_RESET,
                 _ => COLOR_BRIGHT_WHITE,
             };
 
@@ -251,7 +297,7 @@ pub fn run_timer(duration: Duration, name: &str, verbose: bool, theme: ProgressB
     print!("\r\x1B[K");
 
     let complete_color = match theme {
-        ProgressBarTheme::Simple => COLOR_RESET,
+        ProgressBarTheme::Plain => COLOR_RESET,
         ProgressBarTheme::Gradient => COLOR_BRIGHT_GREEN,
         ProgressBarTheme::Rainbow => COLOR_BRIGHT_CYAN,
         ProgressBarTheme::Pulse => COLOR_BRIGHT_CYAN,

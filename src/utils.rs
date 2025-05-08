@@ -1,5 +1,6 @@
-use std::time::Duration;
 use crate::Result;
+use std::env;
+use std::time::Duration;
 
 pub fn format_simple_duration(duration: Duration) -> String {
     let total_secs = duration.as_secs();
@@ -16,15 +17,28 @@ pub fn format_simple_duration(duration: Duration) -> String {
     }
 }
 
+pub fn should_use_color() -> bool {
+    env::var("NO_COLOR").is_err()
+}
+
 pub fn send_notification(name: &str, duration: Duration) -> Result<()> {
     if cfg!(target_os = "linux") {
         let _ = std::process::Command::new("notify-send")
-            .args([&format!("{} completed!", name), &format!("Duration: {}", format_simple_duration(duration))])
+            .args([
+                &format!("{} completed!", name),
+                &format!("Duration: {}", format_simple_duration(duration)),
+            ])
             .spawn();
     } else if cfg!(target_os = "macos") {
         let _ = std::process::Command::new("osascript")
-            .args(["-e", &format!("display notification \"Duration: {}\" with title \"{}\"",
-                   format_simple_duration(duration), format!("{} completed!", name))])
+            .args([
+                "-e",
+                &format!(
+                    "display notification \"Duration: {}\" with title \"{}\"",
+                    format_simple_duration(duration),
+                    format!("{} completed!", name)
+                ),
+            ])
             .spawn();
     } else if cfg!(target_os = "windows") {
         let script = format!(

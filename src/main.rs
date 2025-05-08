@@ -5,10 +5,10 @@ mod utils;
 
 use clap::Parser;
 use humantime::parse_duration;
+use progress::{ProgressBarTheme, run_timer};
 use std::io;
-use thiserror::Error;
-use progress::{run_timer, ProgressBarTheme};
 use themes::parse_theme;
+use thiserror::Error;
 
 // Error handling
 #[derive(Error, Debug)]
@@ -26,7 +26,11 @@ enum TempusError {
 type Result<T> = std::result::Result<T, TempusError>;
 
 #[derive(Parser, Debug)]
-#[command(name = "tempus", version = "1.0", about = "Minimalist timer for your terminal")]
+#[command(
+    name = "tempus",
+    version = "1.0",
+    about = "Minimalist timer for your terminal"
+)]
 struct Args {
     /// Sleep duration (e.g. 5s, 2m, 1h30m)
     #[arg(value_name = "DURATION", required_unless_present = "preset")]
@@ -40,7 +44,7 @@ struct Args {
     #[arg(short, long, default_value_t = false)]
     verbose: bool,
 
-    /// Progress bar theme (gradient, rainbow, simple, pulse)
+    /// Progress bar theme (gradient, rainbow, plain, pulse)
     #[arg(short, long, default_value = "gradient")]
     theme: String,
 
@@ -74,15 +78,22 @@ fn main() -> Result<()> {
         None => args.duration.clone().unwrap_or_default(),
     };
 
-    let duration = parse_duration(&duration_str)
-        .map_err(|_| TempusError::InvalidDuration(duration_str))?;
+    let duration =
+        parse_duration(&duration_str).map_err(|_| TempusError::InvalidDuration(duration_str))?;
 
     let theme = parse_theme(&args.theme);
 
     if args.focus {
         focus_mode::run_focus_mode(duration, &args.name, theme, args.bell, args.notify)?;
     } else {
-        run_timer(duration, &args.name, args.verbose, theme, args.bell, args.notify)?;
+        run_timer(
+            duration,
+            &args.name,
+            args.verbose,
+            theme,
+            args.bell,
+            args.notify,
+        )?;
     }
 
     Ok(())
