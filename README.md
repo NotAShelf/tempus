@@ -6,10 +6,12 @@
 
 ## Features
 
-- **Progress Visualization** - 4 visual themes with smooth transitions
+- **Beautiful Progress Visualization** - 4 visual themes with smooth transitions
 - **Preset Timers** - Quick access to common timers (pomodoro, breaks, etc.)
 - **Notification Options** - Desktop and sound alerts when your timer completes
+- **Focus Mode** - Full-screen TUI interface with keyboard controls
 - **Minimal Interface** - Clean and elegant design that stays out of your way
+- **Color Configuration** - Honors the NO_COLOR environment variable
 
 ## Installation
 
@@ -39,6 +41,9 @@ tempus 30m -n "Meditation" -t rainbow
 
 # Short break without sound notification
 tempus -p short-break --bell=false
+
+# Use without colors (you can also set the NO_COLOR env variable)
+NO_COLOR=1 tempus 5m
 ```
 
 ## Progress Bar Themes
@@ -48,7 +53,7 @@ Tempus comes with four default themes:
 - **Gradient** - Colors shift from green to yellow to red (default)
 - **Rainbow** - Colorful display with blocks in rainbow colors
 - **Pulse** - Animated pulsing effect with cyan/blue colors
-- **Simple** - Classic monochrome style for distraction-free focus
+- **Plain** - Classic monochrome style for distraction-free focus
 
 ## Command Line Options
 
@@ -60,6 +65,7 @@ Tempus comes with four default themes:
 | `-p, --preset`  | Use a preset duration                    |
 | `-b, --bell`    | Enable/disable terminal bell sound       |
 | `-N, --notify`  | Send desktop notification when completed |
+| `-f, --focus`   | Enable full-screen focus mode TUI        |
 
 ### Available Presets
 
@@ -68,6 +74,10 @@ Tempus comes with four default themes:
 - `long-break` - 15 minutes
 - `tea` - 3 minutes
 - `coffee` - 4 minutes
+
+### Environment Variables
+
+- `NO_COLOR` - When set (to any value), all colored output will be disabled and the Plain theme will be used
 
 ## Building & Contributing
 
