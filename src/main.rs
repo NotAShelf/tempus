@@ -63,6 +63,10 @@ struct Args {
     /// Enable focus mode with full-screen TUI
     #[arg(short = 'f', long, default_value_t = false)]
     focus: bool,
+
+    /// Show big ASCII art clock mode
+    #[arg(long, default_value_t = false)]
+    big: bool,
 }
 
 fn main() -> Result<()> {
@@ -82,6 +86,11 @@ fn main() -> Result<()> {
         parse_duration(&duration_str).map_err(|_| TempusError::InvalidDuration(duration_str))?;
 
     let theme = parse_theme(&args.theme);
+
+    if args.big {
+        return progress::run_big_clock(duration, &args.name, args.bell)
+            .map_err(TempusError::IoError);
+    }
 
     if args.focus {
         focus_mode::run_focus_mode(duration, &args.name, theme, args.bell, args.notify)?;

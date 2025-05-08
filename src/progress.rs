@@ -1,9 +1,24 @@
 use crate::Result;
 use crate::utils::{format_simple_duration, send_notification, should_use_color};
-use std::io::{Write, stdout};
+use crossterm::{
+    event::{self, Event, KeyCode},
+    execute,
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
+};
+use std::io::Write;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
-use yansi::{Color, Paint};
+use tui::{
+    Terminal,
+    backend::CrosstermBackend,
+    layout::{Alignment, Constraint, Direction, Layout, Margin},
+    style::{Color, Modifier, Style},
+    text::Span,
+    widgets::{Block, Borders, Paragraph},
+};
+use yansi::{Color as YansiColor, Paint};
+use std::io::stdout;
+use crate::focus_mode::render_big_time;
 
 #[derive(Debug, Clone, Copy)]
 pub enum ProgressBarTheme {
@@ -81,19 +96,21 @@ pub fn run_timer(
         let spinner_paint = match theme {
             ProgressBarTheme::Rainbow => {
                 let colors = [
-                    Color::Red,
-                    Color::Yellow,
-                    Color::Green,
-                    Color::Cyan,
-                    Color::Blue,
-                    Color::Magenta,
+                    YansiColor::Red,
+                    YansiColor::Yellow,
+                    YansiColor::Green,
+                    YansiColor::Cyan,
+                    YansiColor::Blue,
+                    YansiColor::Magenta,
                 ];
                 Paint::new(SPINNER_CHARS[spinner_idx]).fg(colors[(spinner_idx / 2) % colors.len()])
             }
-            ProgressBarTheme::Gradient => Paint::new(SPINNER_CHARS[spinner_idx]).fg(Color::Cyan),
+            ProgressBarTheme::Gradient => {
+                Paint::new(SPINNER_CHARS[spinner_idx]).fg(YansiColor::Cyan)
+            }
             ProgressBarTheme::Plain => Paint::new(SPINNER_CHARS[spinner_idx]),
             ProgressBarTheme::Pulse => {
-                let colors = [Color::Cyan, Color::BrightCyan];
+                let colors = [YansiColor::Cyan, YansiColor::BrightCyan];
                 Paint::new(SPINNER_CHARS[spinner_idx]).fg(colors[spinner_idx % colors.len()])
             }
         };
@@ -109,11 +126,11 @@ pub fn run_timer(
 
                     if position < progress_ratio {
                         let color = if position < 0.33 {
-                            Color::Green
+                            YansiColor::Green
                         } else if position < 0.66 {
-                            Color::Yellow
+                            YansiColor::Yellow
                         } else {
-                            Color::BrightRed
+                            YansiColor::BrightRed
                         };
 
                         print!("{}", Paint::new(PROGRESS_CHARS[7]).fg(color));
@@ -123,7 +140,10 @@ pub fn run_timer(
                         let partial = (progress_ratio * bar_width as f64)
                             - (progress_ratio * bar_width as f64).floor();
                         let idx = (partial * (PROGRESS_CHARS.len() - 1) as f64).floor() as usize;
-                        print!("{}", Paint::new(PROGRESS_CHARS[idx]).fg(Color::BrightGreen));
+                        print!(
+                            "{}",
+                            Paint::new(PROGRESS_CHARS[idx]).fg(YansiColor::BrightGreen)
+                        );
                     } else {
                         print!("{}", PROGRESS_CHARS[8]);
                     }
@@ -136,12 +156,12 @@ pub fn run_timer(
                     if position < progress_ratio {
                         let color_idx = (i * 6 / bar_width) % 6;
                         let color = match color_idx {
-                            0 => Color::Red,
-                            1 => Color::Yellow,
-                            2 => Color::Green,
-                            3 => Color::Cyan,
-                            4 => Color::Blue,
-                            _ => Color::Magenta,
+                            0 => YansiColor::Red,
+                            1 => YansiColor::Yellow,
+                            2 => YansiColor::Green,
+                            3 => YansiColor::Cyan,
+                            4 => YansiColor::Blue,
+                            _ => YansiColor::Magenta,
                         };
 
                         print!("{}", Paint::new(PROGRESS_CHARS[7]).fg(color));
@@ -151,7 +171,10 @@ pub fn run_timer(
                         let partial = (progress_ratio * bar_width as f64)
                             - (progress_ratio * bar_width as f64).floor();
                         let idx = (partial * (PROGRESS_CHARS.len() - 1) as f64).floor() as usize;
-                        print!("{}", Paint::new(PROGRESS_CHARS[idx]).fg(Color::BrightWhite));
+                        print!(
+                            "{}",
+                            Paint::new(PROGRESS_CHARS[idx]).fg(YansiColor::BrightWhite)
+                        );
                     } else {
                         print!("{}", PROGRESS_CHARS[8]);
                     }
@@ -189,11 +212,11 @@ pub fn run_timer(
                         let brightness = (pulse_position * 3.14159).sin().abs();
 
                         let color = if brightness > 0.7 {
-                            Color::BrightCyan
+                            YansiColor::BrightCyan
                         } else if brightness > 0.3 {
-                            Color::Cyan
+                            YansiColor::Cyan
                         } else {
-                            Color::Blue
+                            YansiColor::Blue
                         };
 
                         print!("{}", Paint::new(PROGRESS_CHARS[7]).fg(color));
@@ -203,7 +226,10 @@ pub fn run_timer(
                         let partial = (progress_ratio * bar_width as f64)
                             - (progress_ratio * bar_width as f64).floor();
                         let idx = (partial * (PROGRESS_CHARS.len() - 1) as f64).floor() as usize;
-                        print!("{}", Paint::new(PROGRESS_CHARS[idx]).fg(Color::BrightBlue));
+                        print!(
+                            "{}",
+                            Paint::new(PROGRESS_CHARS[idx]).fg(YansiColor::BrightBlue)
+                        );
                     } else {
                         print!("{}", PROGRESS_CHARS[8]);
                     }
@@ -217,15 +243,15 @@ pub fn run_timer(
             ProgressBarTheme::Plain => None,
             ProgressBarTheme::Gradient => {
                 if percent < 33.0 {
-                    Some(Color::Green)
+                    Some(YansiColor::Green)
                 } else if percent < 66.0 {
-                    Some(Color::Yellow)
+                    Some(YansiColor::Yellow)
                 } else {
-                    Some(Color::BrightRed)
+                    Some(YansiColor::BrightRed)
                 }
             }
-            ProgressBarTheme::Rainbow => Some(Color::BrightWhite),
-            ProgressBarTheme::Pulse => Some(Color::BrightCyan),
+            ProgressBarTheme::Rainbow => Some(YansiColor::BrightWhite),
+            ProgressBarTheme::Pulse => Some(YansiColor::BrightCyan),
         };
         let percent_str = format!("{:.1}%", percent);
         let percent_paint = match percent_color {
@@ -240,7 +266,7 @@ pub fn run_timer(
                 .unwrap_or(Duration::from_secs(0));
             let time_color = match theme {
                 ProgressBarTheme::Plain => None,
-                _ => Some(Color::BrightWhite),
+                _ => Some(YansiColor::BrightWhite),
             };
             let time_str = format!("({})", format_simple_duration(remaining));
             let time_paint = match time_color {
@@ -264,9 +290,9 @@ pub fn run_timer(
 
     let complete_color = match theme {
         ProgressBarTheme::Plain => None,
-        ProgressBarTheme::Gradient => Some(Color::BrightGreen),
-        ProgressBarTheme::Rainbow => Some(Color::BrightCyan),
-        ProgressBarTheme::Pulse => Some(Color::BrightCyan),
+        ProgressBarTheme::Gradient => Some(YansiColor::BrightGreen),
+        ProgressBarTheme::Rainbow => Some(YansiColor::BrightCyan),
+        ProgressBarTheme::Pulse => Some(YansiColor::BrightCyan),
     };
     let complete_paint = match complete_color {
         Some(c) => Paint::new(name).bold().fg(c),
@@ -282,5 +308,126 @@ pub fn run_timer(
         send_notification(name, total_elapsed)?;
     }
 
+    Ok(())
+}
+
+pub fn run_big_clock(duration: Duration, name: &str, bell: bool) -> std::io::Result<()> {
+    enable_raw_mode()?;
+    let mut stdout = stdout();
+    execute!(stdout, EnterAlternateScreen)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+    let start_time = Instant::now();
+    let mut paused = false;
+    let mut pause_time: Option<Instant> = None;
+    let mut total_pause_duration = Duration::from_secs(0);
+    loop {
+        terminal.draw(|f| {
+            let size = f.size();
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .margin(2)
+                .constraints(
+                    [
+                        Constraint::Percentage(40),
+                        Constraint::Length(7),
+                        Constraint::Percentage(40),
+                    ]
+                    .as_ref(),
+                )
+                .split(size);
+            let timer_area = chunks[1];
+            let block = Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::White))
+                .title(Span::styled(
+                    format!(" ⏲️ {} ", name),
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
+                ));
+            f.render_widget(block.clone(), timer_area);
+            let inner_area = timer_area.inner(&Margin {
+                vertical: 1,
+                horizontal: 1,
+            });
+            let rem = if paused {
+                if let Some(pause_start) = pause_time {
+                    pause_start.duration_since(start_time) - total_pause_duration
+                } else {
+                    start_time.elapsed() - total_pause_duration
+                }
+            } else {
+                start_time.elapsed() - total_pause_duration
+            };
+            let remaining = if rem >= duration {
+                Duration::from_secs(0)
+            } else {
+                duration - rem
+            };
+            let big_time = if remaining.as_secs() >= 3600 {
+                format!(
+                    "{:02}:{:02}:{:02}",
+                    remaining.as_secs() / 3600,
+                    (remaining.as_secs() % 3600) / 60,
+                    remaining.as_secs() % 60
+                )
+            } else {
+                format!(
+                    "{:02}:{:02}",
+                    (remaining.as_secs() % 3600) / 60,
+                    remaining.as_secs() % 60
+                )
+            };
+            let big_lines = render_big_time(&big_time);
+            let big_block = Paragraph::new(big_lines.join("\n"))
+                .alignment(Alignment::Center)
+                .style(
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
+                );
+            f.render_widget(big_block, inner_area);
+        })?;
+        if event::poll(std::time::Duration::from_millis(100))? {
+            if let Event::Key(key) = event::read()? {
+                match key.code {
+                    KeyCode::Char('q') | KeyCode::Esc => break,
+                    KeyCode::Char('p') => {
+                        paused = !paused;
+                        if paused {
+                            pause_time = Some(Instant::now());
+                        } else if let Some(pause_start) = pause_time {
+                            total_pause_duration += pause_start.elapsed();
+                            pause_time = None;
+                        }
+                    }
+                    KeyCode::Char('r') => {
+                        pause_time = None;
+                        total_pause_duration = Duration::from_secs(0);
+                        paused = false;
+                    }
+                    _ => {}
+                }
+            }
+        }
+        let rem = if paused {
+            if let Some(pause_start) = pause_time {
+                pause_start.duration_since(start_time) - total_pause_duration
+            } else {
+                start_time.elapsed() - total_pause_duration
+            }
+        } else {
+            start_time.elapsed() - total_pause_duration
+        };
+        if rem >= duration {
+            if bell {
+                print!("\x07");
+            }
+            break;
+        }
+    }
+    disable_raw_mode()?;
+    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
     Ok(())
 }

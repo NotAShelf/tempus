@@ -11,11 +11,50 @@ use tui::{
     layout::{Alignment, Constraint, Direction, Layout, Margin},
     style::{Color, Modifier, Style},
     text::{Span, Spans},
-    widgets::{Block, Borders, Gauge, Paragraph},
+    widgets::{Block, Borders, Paragraph},
 };
 
 use crate::utils::{format_simple_duration, send_notification, should_use_color};
 use crate::{ProgressBarTheme, Result};
+
+static BIG_DIGITS: [&[&str]; 11] = [
+    &[" ███ ", "█   █", "█   █", "█   █", " ███ "], // 0
+    &["  █  ", " ██  ", "  █  ", "  █  ", " ███ "], // 1
+    &[" ███ ", "    █", " ███ ", "█    ", "█████"], // 2
+    &["████ ", "    █", " ███ ", "    █", "████ "], // 3
+    &["█   █", "█   █", "█████", "    █", "    █"], // 4
+    &["█████", "█    ", "████ ", "    █", "████ "], // 5
+    &[" ███ ", "█    ", "████ ", "█   █", " ███ "], // 6
+    &["█████", "    █", "   █ ", "  █  ", "  █  "], // 7
+    &[" ███ ", "█   █", " ███ ", "█   █", " ███ "], // 8
+    &[" ███ ", "█   █", " ████", "    █", " ███ "], // 9
+    &["     ", "  ░  ", "     ", "  ░  ", "     "], // :
+];
+
+pub fn render_big_time(time: &str) -> Vec<String> {
+    let mut lines = vec![String::new(); 5];
+    for ch in time.chars() {
+        let idx = match ch {
+            '0' => 0,
+            '1' => 1,
+            '2' => 2,
+            '3' => 3,
+            '4' => 4,
+            '5' => 5,
+            '6' => 6,
+            '7' => 7,
+            '8' => 8,
+            '9' => 9,
+            ':' => 10,
+            _ => 10,
+        };
+        for (i, l) in BIG_DIGITS[idx].iter().enumerate() {
+            lines[i].push_str(l);
+            lines[i].push(' ');
+        }
+    }
+    lines
+}
 
 pub struct FocusModeApp {
     duration: Duration,
@@ -25,6 +64,10 @@ pub struct FocusModeApp {
     paused: bool,
     pause_time: Option<Instant>,
     total_pause_duration: Duration,
+    notify_remaining: bool,
+    notify_threshold: Duration,
+    notified: bool,
+    last_duration: Duration,
 }
 
 impl FocusModeApp {
@@ -37,6 +80,10 @@ impl FocusModeApp {
             paused: false,
             pause_time: None,
             total_pause_duration: Duration::from_secs(0),
+            notify_remaining: false,
+            notify_threshold: Duration::from_secs(60),
+            notified: false,
+            last_duration: duration,
         }
     }
 
@@ -97,6 +144,31 @@ impl FocusModeApp {
     fn progress(&self) -> f64 {
         let progress = self.elapsed().as_secs_f64() / self.duration.as_secs_f64();
         progress.min(1.0)
+    }
+
+    fn restart(&mut self) {
+        self.start_time = Instant::now();
+        self.paused = false;
+        self.pause_time = None;
+        self.total_pause_duration = Duration::from_secs(0);
+        self.notified = false;
+        self.duration = self.last_duration;
+    }
+
+    fn toggle_notify_remaining(&mut self) {
+        self.notify_remaining = !self.notify_remaining;
+        self.notified = false;
+    }
+
+    fn adjust_notify_threshold(&mut self, delta_secs: i64) {
+        let new = if delta_secs.is_positive() {
+            self.notify_threshold + Duration::from_secs(delta_secs as u64)
+        } else {
+            self.notify_threshold
+                .saturating_sub(Duration::from_secs((-delta_secs) as u64))
+        };
+        self.notify_threshold = new.max(Duration::from_secs(1));
+        self.notified = false;
     }
 }
 
@@ -163,9 +235,11 @@ fn run_app<B: tui::backend::Backend>(
 
             let progress = app.progress();
 
+            let border_color = if app.notify_remaining && app.remaining() <= app.notify_threshold && !app.paused { Color::Red } else { app.get_color(progress) };
+
             let block = Block::default()
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(app.get_color(progress)))
+                .border_style(Style::default().fg(border_color))
                 .title(Span::styled(
                     " 🕰️ FOCUS MODE ",
                     Style::default()
@@ -201,15 +275,19 @@ fn run_app<B: tui::backend::Backend>(
                 );
             f.render_widget(name_text, inner_chunks[0]);
 
-            let progress_label = format!("{:.1}%", progress * 100.0);
-            let gauge = Gauge::default()
-                .block(Block::default())
-                .gauge_style(Style::default().fg(app.get_color(progress)))
-                .ratio(progress)
-                .label(progress_label);
-            f.render_widget(gauge, inner_chunks[1]);
+            let rem = app.remaining();
+            let big_time = if rem.as_secs() >= 3600 {
+                format!("{:02}:{:02}:{:02}", rem.as_secs() / 3600, (rem.as_secs() % 3600) / 60, rem.as_secs() % 60)
+            } else {
+                format!("{:02}:{:02}", (rem.as_secs() % 3600) / 60, rem.as_secs() % 60)
+            };
+            let big_lines = render_big_time(&big_time);
+            let big_block = Paragraph::new(big_lines.join("\n"))
+                .alignment(Alignment::Center)
+                .style(Style::default().fg(Color::White).add_modifier(Modifier::BOLD));
+            f.render_widget(big_block, inner_chunks[1]);
 
-            let time_text = if app.paused {
+            let mut time_text = if app.paused {
                 format!(
                     "PAUSED - {} remaining",
                     format_simple_duration(app.remaining())
@@ -217,6 +295,10 @@ fn run_app<B: tui::backend::Backend>(
             } else {
                 format!("{} remaining", format_simple_duration(app.remaining()))
             };
+
+            if app.notify_remaining {
+                time_text.push_str(&format!(" | notif: {}s", app.notify_threshold.as_secs()));
+            }
 
             let time_paragraph = Paragraph::new(time_text)
                 .alignment(Alignment::Center)
@@ -227,7 +309,7 @@ fn run_app<B: tui::backend::Backend>(
                 }));
             f.render_widget(time_paragraph, inner_chunks[2]);
 
-            let controls_text = "p: pause | +: add 1m | -: subtract 1m | q/ESC: quit";
+            let controls_text = "p: pause | +: add 1m | -: subtract 1m | r: restart | n: notif | <: -10s notif | >: +10s notif | q/ESC: quit";
             let controls_paragraph = Paragraph::new(controls_text)
                 .alignment(Alignment::Center)
                 .style(Style::default().fg(Color::DarkGray));
@@ -238,6 +320,14 @@ fn run_app<B: tui::backend::Backend>(
             .checked_sub(last_tick.elapsed())
             .unwrap_or_else(|| Duration::from_secs(0));
 
+        if app.notify_remaining
+            && !app.notified
+            && app.remaining() <= app.notify_threshold
+            && !app.paused
+        {
+            app.notified = true;
+        }
+
         if event::poll(timeout)? {
             if let Event::Key(key) = event::read()? {
                 match key.code {
@@ -245,6 +335,10 @@ fn run_app<B: tui::backend::Backend>(
                     KeyCode::Char('p') => app.toggle_pause(),
                     KeyCode::Char('+') => app.add_time(60),
                     KeyCode::Char('-') => app.add_time(-60),
+                    KeyCode::Char('r') => app.restart(),
+                    KeyCode::Char('n') => app.toggle_notify_remaining(),
+                    KeyCode::Char('<') => app.adjust_notify_threshold(-10),
+                    KeyCode::Char('>') => app.adjust_notify_threshold(10),
                     KeyCode::Esc => return Ok(()),
                     _ => {}
                 }
