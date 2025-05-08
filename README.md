@@ -1,7 +1,7 @@
 <div align="center">
     <h1>Tempus</h1>
     <strong>Minimalist Terminal Timer with Style</strong>
-    <img src= "./.github/assets/demo.gif alt="Tempus Demo">
+    <img src="./.github/assets/demo.gif" alt="Tempus Demo">
 </div>
 
 ## Features
