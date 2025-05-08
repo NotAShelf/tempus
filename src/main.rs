@@ -1,10 +1,9 @@
-use clap::{Arg, Command};
+use clap::Parser;
 use humantime::parse_duration;
 use std::io::{self, Write, stdout};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 use thiserror::Error;
-use clap::Parser;
 
 #[derive(Error, Debug)]
 enum TempusError {
@@ -24,7 +23,7 @@ const PROGRESS_CHARS: [char; 4] = ['█', '▓', '▒', '░'];
 const SPINNER_CHARS: [char; 10] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
 #[derive(Parser, Debug)]
-#[command(name = "tempus", version = "1.0", about = "Enhanced timer with progress visualization")]
+#[command(name = "tempus", version = "1.0", about = "Minimalist timer for your terminal")]
 struct Args {
     /// Sleep duration (e.g. 5s, 2m, 1h30m)
     #[arg(value_name = "DURATION")]
