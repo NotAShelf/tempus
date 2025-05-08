@@ -3,6 +3,7 @@ use crate::utils::{format_simple_duration, send_notification, should_use_color};
 use std::io::{Write, stdout};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
+use yansi::{Color, Paint};
 
 #[derive(Debug, Clone, Copy)]
 pub enum ProgressBarTheme {
@@ -18,21 +19,6 @@ const SPINNER_CHARS: [char; 10] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '�
 const LEFT_BRACKET: &str = "┃";
 const RIGHT_BRACKET: &str = "┃";
 
-const COLOR_RESET: &str = "\x1B[0m";
-const COLOR_RED: &str = "\x1B[31m";
-const COLOR_BRIGHT_RED: &str = "\x1B[91m";
-const COLOR_GREEN: &str = "\x1B[32m";
-const COLOR_YELLOW: &str = "\x1B[33m";
-const COLOR_BLUE: &str = "\x1B[34m";
-const COLOR_MAGENTA: &str = "\x1B[35m";
-const COLOR_CYAN: &str = "\x1B[36m";
-const COLOR_BRIGHT_CYAN: &str = "\x1B[96m";
-const COLOR_BRIGHT_BLUE: &str = "\x1B[94m";
-const COLOR_BRIGHT_GREEN: &str = "\x1B[92m";
-const COLOR_BRIGHT_WHITE: &str = "\x1B[97m";
-
-const STYLE_BOLD: &str = "\x1B[1m";
-
 pub fn run_timer(
     duration: Duration,
     name: &str,
@@ -44,6 +30,9 @@ pub fn run_timer(
     // If NO_COLOR environment variable is set, override theme to Plain
     if !should_use_color() {
         theme = ProgressBarTheme::Plain;
+        yansi::disable();
+    } else {
+        yansi::enable();
     }
 
     let total_millis = duration.as_millis() as f64;
@@ -89,36 +78,29 @@ pub fn run_timer(
 
         print!("\r\x1B[K");
 
-        let spinner_color = match theme {
+        let spinner_paint = match theme {
             ProgressBarTheme::Rainbow => {
                 let colors = [
-                    COLOR_RED,
-                    COLOR_YELLOW,
-                    COLOR_GREEN,
-                    COLOR_CYAN,
-                    COLOR_BLUE,
-                    COLOR_MAGENTA,
+                    Color::Red,
+                    Color::Yellow,
+                    Color::Green,
+                    Color::Cyan,
+                    Color::Blue,
+                    Color::Magenta,
                 ];
-                colors[(spinner_idx / 2) % colors.len()]
+                Paint::new(SPINNER_CHARS[spinner_idx]).fg(colors[(spinner_idx / 2) % colors.len()])
             }
-            ProgressBarTheme::Gradient => COLOR_CYAN,
-            ProgressBarTheme::Plain => COLOR_RESET,
+            ProgressBarTheme::Gradient => Paint::new(SPINNER_CHARS[spinner_idx]).fg(Color::Cyan),
+            ProgressBarTheme::Plain => Paint::new(SPINNER_CHARS[spinner_idx]),
             ProgressBarTheme::Pulse => {
-                let colors = [COLOR_CYAN, COLOR_BRIGHT_CYAN];
-                colors[spinner_idx % colors.len()]
+                let colors = [Color::Cyan, Color::BrightCyan];
+                Paint::new(SPINNER_CHARS[spinner_idx]).fg(colors[spinner_idx % colors.len()])
             }
         };
-
-        print!(
-            "{}{}{} ",
-            spinner_color, SPINNER_CHARS[spinner_idx], COLOR_RESET
-        );
+        print!("{} ", spinner_paint);
         spinner_idx = (spinner_idx + 1) % SPINNER_CHARS.len();
 
-        match theme {
-            ProgressBarTheme::Plain => print!("{}", LEFT_BRACKET),
-            _ => print!("{}", LEFT_BRACKET),
-        }
+        print!("{}", LEFT_BRACKET);
 
         match theme {
             ProgressBarTheme::Gradient => {
@@ -127,24 +109,21 @@ pub fn run_timer(
 
                     if position < progress_ratio {
                         let color = if position < 0.33 {
-                            COLOR_GREEN
+                            Color::Green
                         } else if position < 0.66 {
-                            COLOR_YELLOW
+                            Color::Yellow
                         } else {
-                            COLOR_BRIGHT_RED
+                            Color::BrightRed
                         };
 
-                        print!("{}{}{}", color, PROGRESS_CHARS[7], COLOR_RESET);
+                        print!("{}", Paint::new(PROGRESS_CHARS[7]).fg(color));
                     } else if i == (progress_ratio * bar_width as f64) as usize
                         && progress_ratio < 1.0
                     {
                         let partial = (progress_ratio * bar_width as f64)
                             - (progress_ratio * bar_width as f64).floor();
                         let idx = (partial * (PROGRESS_CHARS.len() - 1) as f64).floor() as usize;
-                        print!(
-                            "{}{}{}",
-                            COLOR_BRIGHT_GREEN, PROGRESS_CHARS[idx], COLOR_RESET
-                        );
+                        print!("{}", Paint::new(PROGRESS_CHARS[idx]).fg(Color::BrightGreen));
                     } else {
                         print!("{}", PROGRESS_CHARS[8]);
                     }
@@ -157,25 +136,22 @@ pub fn run_timer(
                     if position < progress_ratio {
                         let color_idx = (i * 6 / bar_width) % 6;
                         let color = match color_idx {
-                            0 => COLOR_RED,
-                            1 => COLOR_YELLOW,
-                            2 => COLOR_GREEN,
-                            3 => COLOR_CYAN,
-                            4 => COLOR_BLUE,
-                            _ => COLOR_MAGENTA,
+                            0 => Color::Red,
+                            1 => Color::Yellow,
+                            2 => Color::Green,
+                            3 => Color::Cyan,
+                            4 => Color::Blue,
+                            _ => Color::Magenta,
                         };
 
-                        print!("{}{}{}", color, PROGRESS_CHARS[7], COLOR_RESET);
+                        print!("{}", Paint::new(PROGRESS_CHARS[7]).fg(color));
                     } else if i == (progress_ratio * bar_width as f64) as usize
                         && progress_ratio < 1.0
                     {
                         let partial = (progress_ratio * bar_width as f64)
                             - (progress_ratio * bar_width as f64).floor();
                         let idx = (partial * (PROGRESS_CHARS.len() - 1) as f64).floor() as usize;
-                        print!(
-                            "{}{}{}",
-                            COLOR_BRIGHT_WHITE, PROGRESS_CHARS[idx], COLOR_RESET
-                        );
+                        print!("{}", Paint::new(PROGRESS_CHARS[idx]).fg(Color::BrightWhite));
                     } else {
                         print!("{}", PROGRESS_CHARS[8]);
                     }
@@ -213,24 +189,21 @@ pub fn run_timer(
                         let brightness = (pulse_position * 3.14159).sin().abs();
 
                         let color = if brightness > 0.7 {
-                            COLOR_BRIGHT_CYAN
+                            Color::BrightCyan
                         } else if brightness > 0.3 {
-                            COLOR_CYAN
+                            Color::Cyan
                         } else {
-                            COLOR_BLUE
+                            Color::Blue
                         };
 
-                        print!("{}{}{}", color, PROGRESS_CHARS[7], COLOR_RESET);
+                        print!("{}", Paint::new(PROGRESS_CHARS[7]).fg(color));
                     } else if i == (progress_ratio * bar_width as f64) as usize
                         && progress_ratio < 1.0
                     {
                         let partial = (progress_ratio * bar_width as f64)
                             - (progress_ratio * bar_width as f64).floor();
                         let idx = (partial * (PROGRESS_CHARS.len() - 1) as f64).floor() as usize;
-                        print!(
-                            "{}{}{}",
-                            COLOR_BRIGHT_BLUE, PROGRESS_CHARS[idx], COLOR_RESET
-                        );
+                        print!("{}", Paint::new(PROGRESS_CHARS[idx]).fg(Color::BrightBlue));
                     } else {
                         print!("{}", PROGRESS_CHARS[8]);
                     }
@@ -238,50 +211,43 @@ pub fn run_timer(
             }
         }
 
-        match theme {
-            ProgressBarTheme::Plain => print!("{}", RIGHT_BRACKET),
-            _ => print!("{}", RIGHT_BRACKET),
-        }
+        print!("{}", RIGHT_BRACKET);
 
         let percent_color = match theme {
-            ProgressBarTheme::Plain => COLOR_RESET,
+            ProgressBarTheme::Plain => None,
             ProgressBarTheme::Gradient => {
                 if percent < 33.0 {
-                    COLOR_GREEN
+                    Some(Color::Green)
                 } else if percent < 66.0 {
-                    COLOR_YELLOW
+                    Some(Color::Yellow)
                 } else {
-                    COLOR_BRIGHT_RED
+                    Some(Color::BrightRed)
                 }
             }
-            ProgressBarTheme::Rainbow => COLOR_BRIGHT_WHITE,
-            ProgressBarTheme::Pulse => COLOR_BRIGHT_CYAN,
+            ProgressBarTheme::Rainbow => Some(Color::BrightWhite),
+            ProgressBarTheme::Pulse => Some(Color::BrightCyan),
         };
-
-        print!(
-            " {}{}{:.1}%{}",
-            STYLE_BOLD, percent_color, percent, COLOR_RESET
-        );
+        let percent_str = format!("{:.1}%", percent);
+        let percent_paint = match percent_color {
+            Some(c) => Paint::new(percent_str).bold().fg(c),
+            None => Paint::new(percent_str).bold(),
+        };
+        print!(" {}", percent_paint);
 
         if verbose {
             let remaining = duration
                 .checked_sub(elapsed)
                 .unwrap_or(Duration::from_secs(0));
-
             let time_color = match theme {
-                ProgressBarTheme::Plain => COLOR_RESET,
-                _ => COLOR_BRIGHT_WHITE,
+                ProgressBarTheme::Plain => None,
+                _ => Some(Color::BrightWhite),
             };
-
-            print!(
-                " {}({}){} {}{}{}",
-                time_color,
-                format_simple_duration(remaining),
-                COLOR_RESET,
-                STYLE_BOLD,
-                name,
-                COLOR_RESET
-            );
+            let time_str = format!("({})", format_simple_duration(remaining));
+            let time_paint = match time_color {
+                Some(c) => Paint::new(time_str).fg(c),
+                None => Paint::new(time_str),
+            };
+            print!(" {}{}", time_paint, Paint::new(name).bold());
         }
 
         stdout().flush()?;
@@ -297,19 +263,18 @@ pub fn run_timer(
     print!("\r\x1B[K");
 
     let complete_color = match theme {
-        ProgressBarTheme::Plain => COLOR_RESET,
-        ProgressBarTheme::Gradient => COLOR_BRIGHT_GREEN,
-        ProgressBarTheme::Rainbow => COLOR_BRIGHT_CYAN,
-        ProgressBarTheme::Pulse => COLOR_BRIGHT_CYAN,
+        ProgressBarTheme::Plain => None,
+        ProgressBarTheme::Gradient => Some(Color::BrightGreen),
+        ProgressBarTheme::Rainbow => Some(Color::BrightCyan),
+        ProgressBarTheme::Pulse => Some(Color::BrightCyan),
     };
-
+    let complete_paint = match complete_color {
+        Some(c) => Paint::new(name).bold().fg(c),
+        None => Paint::new(name).bold(),
+    };
     println!(
-        "{}{}{}{} completed!{} (took {})",
-        STYLE_BOLD,
-        complete_color,
-        name,
-        COLOR_RESET,
-        COLOR_RESET,
+        "{} completed! (took {})",
+        complete_paint,
         format_simple_duration(total_elapsed)
     );
 

@@ -110,6 +110,9 @@ pub fn run_focus_mode(
     // If NO_COLOR environment variable is set, override theme to Plain
     if !should_use_color() {
         theme = ProgressBarTheme::Plain;
+        yansi::disable();
+    } else {
+        yansi::enable();
     }
 
     enable_raw_mode()?;

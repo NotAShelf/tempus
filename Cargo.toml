@@ -16,6 +16,7 @@ thiserror = "2.0"
 ctrlc = "3.4"
 tui = "0.19"
 crossterm = "0.29"
+yansi = "1.0.1"
 
 [profile.release]
 opt-level = 3
