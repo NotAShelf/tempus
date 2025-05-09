@@ -10,7 +10,7 @@ use tui::{
     backend::CrosstermBackend,
     layout::{Alignment, Constraint, Direction, Layout, Margin},
     style::{Color, Modifier, Style},
-    text::{Span, Spans},
+    text::{Span, Spans, Text},
     widgets::{Block, Borders, Paragraph},
 };
 
@@ -257,10 +257,10 @@ fn run_app<B: tui::backend::Backend>(
                 .direction(Direction::Vertical)
                 .constraints(
                     [
-                        Constraint::Length(1),
-                        Constraint::Length(1),
-                        Constraint::Length(1),
-                        Constraint::Length(1),
+                        Constraint::Length(1),    // name
+                        Constraint::Length(1),    // progress bar
+                        Constraint::Length(1),    // time text
+                        Constraint::Length(1),    // controls
                     ]
                     .as_ref(),
                 )
@@ -275,17 +275,35 @@ fn run_app<B: tui::backend::Backend>(
                 );
             f.render_widget(name_text, inner_chunks[0]);
 
-            let rem = app.remaining();
-            let big_time = if rem.as_secs() >= 3600 {
-                format!("{:02}:{:02}:{:02}", rem.as_secs() / 3600, (rem.as_secs() % 3600) / 60, rem.as_secs() % 60)
-            } else {
-                format!("{:02}:{:02}", (rem.as_secs() % 3600) / 60, rem.as_secs() % 60)
-            };
-            let big_lines = render_big_time(&big_time);
-            let big_block = Paragraph::new(big_lines.join("\n"))
-                .alignment(Alignment::Center)
-                .style(Style::default().fg(Color::White).add_modifier(Modifier::BOLD));
-            f.render_widget(big_block, inner_chunks[1]);
+            // --- Progress Bar: fills from left to right, percentage always centered, text color changes on fill ---
+            let bar_width: usize = inner_area.width as usize;
+            let percent = (progress * 100.0).min(100.0);
+            let percent_text = format!("{:.1}%", percent);
+            let percent_pos = (bar_width.saturating_sub(percent_text.len())) / 2;
+            let bar_color = border_color;
+            let filled = (progress * bar_width as f64).round() as usize;
+            let mut bar_spans = Vec::with_capacity(bar_width);
+            for i in 0..bar_width {
+                if i >= percent_pos && i < percent_pos + percent_text.len() {
+                    let c = percent_text.chars().nth(i - percent_pos).unwrap_or(' ');
+                    // If the percent text is over the filled part, use black fg, else bar color fg
+                    let style = if i < filled {
+                        Style::default().fg(Color::Black).bg(bar_color).add_modifier(Modifier::BOLD)
+                    } else {
+                        Style::default().fg(bar_color).add_modifier(Modifier::BOLD)
+                    };
+                    bar_spans.push(Span::styled(c.to_string(), style));
+                } else if i < filled {
+                    // Filled part
+                    bar_spans.push(Span::styled(" ", Style::default().bg(bar_color)));
+                } else {
+                    // Empty part
+                    bar_spans.push(Span::raw(" "));
+                }
+            }
+            let bar_paragraph = Paragraph::new(Text::from(vec![Spans::from(bar_spans)]))
+                .alignment(Alignment::Left);
+            f.render_widget(bar_paragraph, inner_chunks[1]);
 
             let mut time_text = if app.paused {
                 format!(
@@ -306,7 +324,7 @@ fn run_app<B: tui::backend::Backend>(
                     Color::Yellow
                 } else {
                     Color::White
-                }));
+                }).add_modifier(Modifier::BOLD));
             f.render_widget(time_paragraph, inner_chunks[2]);
 
             let controls_text = "p: pause | +: add 1m | -: subtract 1m | r: restart | n: notif | <: -10s notif | >: +10s notif | q/ESC: quit";
