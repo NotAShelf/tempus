@@ -71,11 +71,11 @@ jobs:
           tool: cross
 
       - name: Build binary (native)
-        if: !matrix.cross
+        if: ${{ !matrix.cross }}
         run: cargo build --release --target ${{ matrix.target }}
 
       - name: Build binary (cross)
-        if: matrix.cross
+        if: ${{ matrix.cross }}
         run: cross build --release --target ${{ matrix.target }}
 
       - name: Prepare binary (Unix)
@@ -91,9 +91,7 @@ jobs:
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            ${{ matrix.name }}
-            ${{ matrix.name }}.asc
+          files: ${{ matrix.name }}
 
   generate-checksums:
     needs: [create-release, build-release]
@@ -113,8 +111,6 @@ jobs:
           sha256sum tempus-* > SHA256SUMS
 
       - name: Upload Checksums
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
-          files: |
-            SHA256SUMS
-            SHA256SUMS.asc
+          files: SHA256SUMS
