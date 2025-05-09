@@ -11,7 +11,8 @@
 - **Notification Options** - Desktop and sound alerts when your timer completes
 - **Focus Mode** - Full-screen TUI interface with keyboard controls
 - **Minimal Interface** - Clean and elegant design that stays out of your way
-- **Color Configuration** - Honors the NO_COLOR environment variable
+- **Color Configuration** - Honors the `NO_COLOR` environment variable
+- **Countdown Mode** - Set timers to specific dates and times
 
 ## Installation
 
@@ -44,6 +45,18 @@ tempus -p short-break --bell=false
 
 # Use without colors (you can also set the NO_COLOR env variable)
 NO_COLOR=1 tempus 5m
+
+# Countdown to a specific time (today or tomorrow)
+tempus countdown 20:00
+
+# Countdown to a specific date and time
+tempus countdown "2025-12-31 23:59:59" --name "New Year"
+
+# Countdown with a theme
+tempus countdown "2025-05-10" --theme rainbow
+
+# Countdown with big clock display
+tempus countdown "14:30" --big
 ```
 
 ## Progress Bar Themes
@@ -57,6 +70,8 @@ Tempus comes with four default themes:
 
 ## Command Line Options
 
+### Main Options
+
 | Option          | Description                              |
 | --------------- | ---------------------------------------- |
 | `-n, --name`    | Give your timer a name                   |
@@ -66,6 +81,22 @@ Tempus comes with four default themes:
 | `-b, --bell`    | Enable/disable terminal bell sound       |
 | `-N, --notify`  | Send desktop notification when completed |
 | `-f, --focus`   | Enable full-screen focus mode TUI        |
+| `--big`         | Show big ASCII art clock mode            |
+
+### Countdown Subcommand
+
+| Subcommand         | Description                                        |
+| ------------------ | -------------------------------------------------- |
+| `countdown <DATE>` | Start a countdown to a specific date/time          |
+
+The countdown subcommand supports various date and time formats:
+- Full date and time: `"2025-12-31 23:59:59"`
+- Date with time: `"2025-12-31 20:00"`
+- Date only: `"2025-12-31"` (counts down to midnight)
+- Time only: `"20:00"` or `"20:00:00"` (counts down to that time today or tomorrow)
+- RFC 3339 format: `"2025-12-31T23:59:59-04:00"`
+
+If you specify only a time that has already passed today, it will automatically count down to that time tomorrow.
 
 ### Available Presets
 
