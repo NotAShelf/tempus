@@ -1,4 +1,5 @@
 use crate::Result;
+use crate::focus_mode::render_big_time;
 use crate::utils::{format_simple_duration, send_notification, should_use_color};
 use crossterm::{
     event::{self, Event, KeyCode},
@@ -6,6 +7,7 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use std::io::Write;
+use std::io::stdout;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 use tui::{
@@ -17,8 +19,6 @@ use tui::{
     widgets::{Block, Borders, Paragraph},
 };
 use yansi::{Color as YansiColor, Paint};
-use std::io::stdout;
-use crate::focus_mode::render_big_time;
 
 #[derive(Debug, Clone, Copy)]
 pub enum ProgressBarTheme {
