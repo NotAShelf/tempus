@@ -6,7 +6,7 @@ mod utils;
 use chrono::{DateTime, Local, NaiveDate, NaiveDateTime, NaiveTime, TimeZone};
 use clap::{Parser, Subcommand};
 use humantime::parse_duration;
-use progress::{run_timer, ProgressBarTheme};
+use progress::{ProgressBarTheme, run_timer};
 use std::{io, process};
 use themes::parse_theme;
 use thiserror::Error;
@@ -125,7 +125,7 @@ fn parse_datetime(datetime: &str) -> Result<DateTime<Local>> {
                 let today = now.date_naive();
                 let ndt = today.and_time(nt);
                 let dt = Local.from_local_datetime(&ndt).single().unwrap();
-                
+
                 // If the time is in the past, set it for tomorrow
                 if dt <= now {
                     let tomorrow = today.succ_opt().unwrap();
@@ -142,7 +142,7 @@ fn parse_datetime(datetime: &str) -> Result<DateTime<Local>> {
                 let today = now.date_naive();
                 let ndt = today.and_time(nt);
                 let dt = Local.from_local_datetime(&ndt).single().unwrap();
-                
+
                 // If the time is in the past, set it for tomorrow
                 if dt <= now {
                     let tomorrow = today.succ_opt().unwrap();
@@ -168,19 +168,27 @@ fn get_duration_from_preset(preset: &str) -> String {
 }
 
 fn handle_countdown(cmd: &Command) -> Result<()> {
-    let Command::Countdown { datetime, name, theme, bell, notify, big } = cmd;
-    
+    let Command::Countdown {
+        datetime,
+        name,
+        theme,
+        bell,
+        notify,
+        big,
+    } = cmd;
+
     let target = parse_datetime(datetime)?;
     let now = Local::now();
-    
-    let duration = (target - now).to_std().expect("Duration should be positive");
+
+    let duration = (target - now)
+        .to_std()
+        .expect("Duration should be positive");
     let theme_enum = parse_theme(theme);
-    
+
     if *big {
-        return progress::run_big_clock(duration, name, *bell)
-            .map_err(TempusError::IoError);
+        return progress::run_big_clock(duration, name, *bell).map_err(TempusError::IoError);
     }
-    
+
     run_timer(duration, name, false, theme_enum, *bell, *notify)
 }
 
@@ -190,8 +198,8 @@ fn handle_timer(args: &Args) -> Result<()> {
         None => args.duration.clone().unwrap_or_default(),
     };
 
-    let duration = parse_duration(&duration_str)
-        .map_err(|_| TempusError::InvalidDuration(duration_str))?;
+    let duration =
+        parse_duration(&duration_str).map_err(|_| TempusError::InvalidDuration(duration_str))?;
 
     let theme = parse_theme(&args.theme);
 
@@ -218,15 +226,17 @@ fn handle_timer(args: &Args) -> Result<()> {
 
 fn main() -> Result<()> {
     let args = Args::parse();
-    
+
     match &args.command {
         Some(cmd) => handle_countdown(cmd),
         None => {
             if args.duration.is_none() && args.preset.is_none() {
-                eprintln!("Error: Either DURATION or --preset must be provided when not using a subcommand");
+                eprintln!(
+                    "Error: Either DURATION or --preset must be provided when not using a subcommand"
+                );
                 process::exit(1);
             }
-            
+
             handle_timer(&args)
         }
     }
