@@ -114,7 +114,11 @@ If you specify only a time that has already passed today, it will automatically 
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
+## Attribution
+
+Tempus is greatly inspired by [clock-tui](https://github.com/race604/clock-tui) and [timer](https://github.com/caarlos0/timer).
+
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE file](LICENSE)
+This project is licensed under the MPL v2.0 License - see the [LICENSE file](LICENSE)
 for details.
