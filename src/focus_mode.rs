@@ -13,6 +13,8 @@ use ratatui::{
 };
 use std::io::stdout;
 use std::time::{Duration, Instant};
+use colorgrad;
+use colorgrad::Gradient;
 
 use crate::utils::{format_simple_duration, send_notification, should_use_color};
 use crate::{ProgressBarTheme, Result};
@@ -91,6 +93,19 @@ impl FocusModeApp {
         match self.theme {
             ProgressBarTheme::Plain => Color::White,
             ProgressBarTheme::Gradient => {
+                let gradient: colorgrad::LinearGradient = colorgrad::GradientBuilder::new()
+                    .colors(&[
+                        colorgrad::Color::new(0.0, 1.0, 0.0, 1.0), // Green
+                        colorgrad::Color::new(1.0, 1.0, 0.0, 1.0), // Yellow
+                        colorgrad::Color::new(1.0, 0.0, 0.0, 1.0), // Red
+                    ])
+                    .build()
+                    .unwrap();
+                let color = gradient.at(progress as f32).to_rgba8();
+                Color::Rgb(color[0], color[1], color[2])
+            }
+            ProgressBarTheme::Color => {
+                // This is the old "Gradient" theme behavior
                 if progress < 0.33 {
                     Color::Green
                 } else if progress < 0.66 {

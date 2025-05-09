@@ -1,6 +1,9 @@
 use crate::Result;
 use crate::focus_mode::render_big_time;
 use crate::utils::{format_simple_duration, send_notification, should_use_color};
+use chrono::{DateTime, Local};
+use colorgrad;
+use colorgrad::Gradient;
 use crossterm::{
     event::{self, Event, KeyCode},
     execute,
@@ -18,7 +21,7 @@ use std::f64::consts::PI;
 use std::io::Write;
 use std::io::stdout;
 use std::thread::sleep;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 use yansi::{Color as YansiColor, Paint};
 
 #[derive(Debug, Clone, Copy)]
@@ -27,6 +30,7 @@ pub enum ProgressBarTheme {
     Rainbow,
     Plain,
     Pulse,
+    Color,
 }
 
 const PROGRESS_CHARS: [char; 9] = ['▏', '▎', '▍', '▌', '▋', '▊', '▉', '█', ' '];
@@ -42,6 +46,7 @@ pub fn run_timer(
     mut theme: ProgressBarTheme,
     bell: bool,
     notify: bool,
+    use_12h: bool,
 ) -> Result<()> {
     // If NO_COLOR environment variable is set, override theme to Plain
     if !should_use_color() {
@@ -53,9 +58,19 @@ pub fn run_timer(
 
     let total_millis = duration.as_millis() as f64;
     let start_time = Instant::now();
+    let start_system_time = SystemTime::now();
+    let start_datetime: DateTime<Local> = start_system_time.into();
+    let start_time_str = if use_12h {
+        start_datetime.format("%I:%M:%S %p").to_string()
+    } else {
+        start_datetime.format("%H:%M:%S").to_string()
+    };
 
-    print!("\x1B[?25l");
+    print!("\x1B[?25l"); // hide cursor
     stdout().flush()?;
+
+    // This will be updated in-place to show the progress bar
+    println!("");
 
     struct CursorGuard;
     impl Drop for CursorGuard {
@@ -92,7 +107,40 @@ pub fn run_timer(
         let progress_ratio = elapsed_millis / total_millis;
         let percent = (progress_ratio * 100.0).min(100.0);
 
-        print!("\r\x1B[K");
+        print!("\x1B[1A\r\x1B[K"); // move cursor up one line
+
+        // Display the header with start time, name, and remaining time
+        let remaining = duration
+            .checked_sub(elapsed)
+            .unwrap_or(Duration::from_secs(0));
+
+        let header_color = match theme {
+            ProgressBarTheme::Plain => None,
+            _ => Some(YansiColor::BrightWhite),
+        };
+
+        let start_time_paint = match header_color {
+            Some(c) => Paint::new(&start_time_str).fg(c),
+            None => Paint::new(&start_time_str),
+        };
+
+        let name_paint = match header_color {
+            Some(c) => Paint::new(name).bold().fg(c),
+            None => Paint::new(name).bold(),
+        };
+
+        let remaining_str = format_simple_duration(remaining);
+        let remaining_paint = match header_color {
+            Some(c) => Paint::new(&remaining_str).fg(c),
+            None => Paint::new(&remaining_str),
+        };
+
+        print!(
+            "{} | {} | {} remaining",
+            start_time_paint, name_paint, remaining_paint
+        );
+
+        print!("\n\r\x1B[K"); // move cursor down one line and clear it
 
         let spinner_paint = match theme {
             ProgressBarTheme::Rainbow => {
@@ -109,6 +157,7 @@ pub fn run_timer(
             ProgressBarTheme::Gradient => {
                 Paint::new(SPINNER_CHARS[spinner_idx]).fg(YansiColor::Cyan)
             }
+            ProgressBarTheme::Color => Paint::new(SPINNER_CHARS[spinner_idx]).fg(YansiColor::Cyan),
             ProgressBarTheme::Plain => Paint::new(SPINNER_CHARS[spinner_idx]),
             ProgressBarTheme::Pulse => {
                 let colors = [YansiColor::Cyan, YansiColor::BrightCyan];
@@ -122,29 +171,28 @@ pub fn run_timer(
 
         match theme {
             ProgressBarTheme::Gradient => {
+                let gradient: colorgrad::LinearGradient = colorgrad::GradientBuilder::new()
+                    .colors(&[
+                        colorgrad::Color::new(0.0, 1.0, 0.0, 1.0), // Green
+                        colorgrad::Color::new(1.0, 1.0, 0.0, 1.0), // Yellow
+                        colorgrad::Color::new(1.0, 0.0, 0.0, 1.0), // Red
+                    ])
+                    .build()
+                    .unwrap();
                 for i in 0..bar_width {
                     let position = i as f64 / bar_width as f64;
-
                     if position < progress_ratio {
-                        let color = if position < 0.33 {
-                            YansiColor::Green
-                        } else if position < 0.66 {
-                            YansiColor::Yellow
-                        } else {
-                            YansiColor::BrightRed
-                        };
-
-                        print!("{}", Paint::new(PROGRESS_CHARS[7]).fg(color));
-                    } else if i == (progress_ratio * bar_width as f64) as usize
-                        && progress_ratio < 1.0
-                    {
+                        let rel_pos = position / progress_ratio.max(0.01);
+                        let color = gradient.at(rel_pos as f32).to_rgba8();
+                        let yansi_color = YansiColor::Rgb(color[0], color[1], color[2]);
+                        print!("{}", Paint::new(PROGRESS_CHARS[7]).fg(yansi_color));
+                    } else if i == (progress_ratio * bar_width as f64) as usize && progress_ratio < 1.0 {
                         let partial = (progress_ratio * bar_width as f64)
                             - (progress_ratio * bar_width as f64).floor();
                         let idx = (partial * (PROGRESS_CHARS.len() - 1) as f64).floor() as usize;
-                        print!(
-                            "{}",
-                            Paint::new(PROGRESS_CHARS[idx]).fg(YansiColor::BrightGreen)
-                        );
+                        let color = gradient.at(0.0).to_rgba8();
+                        let yansi_color = YansiColor::Rgb(color[0], color[1], color[2]);
+                        print!("{}", Paint::new(PROGRESS_CHARS[idx]).fg(yansi_color));
                     } else {
                         print!("{}", PROGRESS_CHARS[8]);
                     }
@@ -236,6 +284,35 @@ pub fn run_timer(
                     }
                 }
             }
+            ProgressBarTheme::Color => {
+                for i in 0..bar_width {
+                    let position = i as f64 / bar_width as f64;
+
+                    if position < progress_ratio {
+                        let color = if position < 0.33 {
+                            YansiColor::Green
+                        } else if position < 0.66 {
+                            YansiColor::Yellow
+                        } else {
+                            YansiColor::BrightRed
+                        };
+
+                        print!("{}", Paint::new(PROGRESS_CHARS[7]).fg(color));
+                    } else if i == (progress_ratio * bar_width as f64) as usize
+                        && progress_ratio < 1.0
+                    {
+                        let partial = (progress_ratio * bar_width as f64)
+                            - (progress_ratio * bar_width as f64).floor();
+                        let idx = (partial * (PROGRESS_CHARS.len() - 1) as f64).floor() as usize;
+                        print!(
+                            "{}",
+                            Paint::new(PROGRESS_CHARS[idx]).fg(YansiColor::BrightGreen)
+                        );
+                    } else {
+                        print!("{}", PROGRESS_CHARS[8]);
+                    }
+                }
+            }
         }
 
         print!("{}", RIGHT_BRACKET);
@@ -243,6 +320,19 @@ pub fn run_timer(
         let percent_color = match theme {
             ProgressBarTheme::Plain => None,
             ProgressBarTheme::Gradient => {
+                let gradient: colorgrad::LinearGradient = colorgrad::GradientBuilder::new()
+                    .colors(&[
+                        colorgrad::Color::new(0.0, 1.0, 0.0, 1.0), // Green
+                        colorgrad::Color::new(1.0, 1.0, 0.0, 1.0), // Yellow
+                        colorgrad::Color::new(1.0, 0.0, 0.0, 1.0), // Red
+                    ])
+                    .build()
+                    .unwrap();
+                let color = gradient.at((percent / 100.0) as f32).to_rgba8();
+                Some(YansiColor::Rgb(color[0], color[1], color[2]))
+            }
+            ProgressBarTheme::Color => {
+                // Keep the original "Gradient" behavior
                 if percent < 33.0 {
                     Some(YansiColor::Green)
                 } else if percent < 66.0 {
@@ -294,6 +384,7 @@ pub fn run_timer(
         ProgressBarTheme::Gradient => Some(YansiColor::BrightGreen),
         ProgressBarTheme::Rainbow => Some(YansiColor::BrightCyan),
         ProgressBarTheme::Pulse => Some(YansiColor::BrightCyan),
+        ProgressBarTheme::Color => Some(YansiColor::BrightGreen),
     };
     let complete_paint = match complete_color {
         Some(c) => Paint::new(name).bold().fg(c),

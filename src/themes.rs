@@ -1,6 +1,7 @@
 use crate::progress::ProgressBarTheme;
 use std::str::FromStr;
 
+/// Error type for theme parsing failures
 #[derive(Debug, Clone, Copy)]
 pub struct ThemeParseError;
 
@@ -21,11 +22,13 @@ impl FromStr for ProgressBarTheme {
             "plain" => ProgressBarTheme::Plain,
             "pulse" => ProgressBarTheme::Pulse,
             "gradient" => ProgressBarTheme::Gradient,
+            "color" => ProgressBarTheme::Color,
             _ => return Err(ThemeParseError),
         })
     }
 }
 
+/// Parse a theme name into a ProgressBarTheme, defaulting to Gradient for unknown names.
 pub fn parse_theme(theme_name: &str) -> ProgressBarTheme {
     ProgressBarTheme::from_str(theme_name).unwrap_or(ProgressBarTheme::Gradient)
 }

@@ -101,6 +101,10 @@ struct Args {
     /// Show big ASCII art clock mode
     #[arg(long, default_value_t = false)]
     big: bool,
+
+    /// Use 12-hour time format instead of 24-hour
+    #[arg(long, default_value_t = false)]
+    use_12h: bool,
 }
 
 fn parse_datetime(datetime: &str) -> Result<DateTime<Local>> {
@@ -189,7 +193,8 @@ fn handle_countdown(cmd: &Command) -> Result<()> {
         return progress::run_big_clock(duration, name, *bell).map_err(TempusError::IoError);
     }
 
-    run_timer(duration, name, false, theme_enum, *bell, *notify)
+    // For countdown, we'll use default 24h time format since there's no option in the countdown command
+    run_timer(duration, name, false, theme_enum, *bell, *notify, false)
 }
 
 fn handle_timer(args: &Args) -> Result<()> {
@@ -218,6 +223,7 @@ fn handle_timer(args: &Args) -> Result<()> {
             theme,
             args.bell,
             args.notify,
+            args.use_12h,
         )?;
     }
 
