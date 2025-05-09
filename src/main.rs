@@ -59,8 +59,8 @@ enum Command {
 #[derive(Parser, Debug)]
 #[command(
     name = "tempus",
-    version = "0.3.0",
-    about = "Minimalist timer for your terminal"
+    version = "0.3.4",
+    about = "Simple, portable and tiny terminal timer utility "
 )]
 struct Args {
     #[command(subcommand)]

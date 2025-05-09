@@ -1,7 +1,14 @@
 [package]
 name = "tempus"
-version = "0.3.1"
+version = "0.3.4"
 edition = "2024"
+license = "MPL"
+description = "Simple, portable and tiny terminal timer utility"
+homepage = "https://github.com/notashelf/tempus"
+repository = "https://github.com/notashelf/tempus"
+readme = "README.md"
+authors = ["Race604 <raf@notashelf.dev>"]
+
 
 [dependencies]
 clap = { version = "4.5", default-features = false, features = [
@@ -14,7 +21,7 @@ clap = { version = "4.5", default-features = false, features = [
 humantime = "2.2"
 thiserror = "2.0"
 ctrlc = "3.4"
-tui = "0.19"
+ratatui = "0.29.0"
 crossterm = "0.29"
 yansi = "1.0.1"
 chrono = { version = "0.4", features = ["clock", "serde"] }

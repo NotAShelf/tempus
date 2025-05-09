@@ -6,11 +6,7 @@ use crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use std::io::Write;
-use std::io::stdout;
-use std::thread::sleep;
-use std::time::{Duration, Instant};
-use tui::{
+use ratatui::{
     Terminal,
     backend::CrosstermBackend,
     layout::{Alignment, Constraint, Direction, Layout, Margin},
@@ -18,6 +14,11 @@ use tui::{
     text::Span,
     widgets::{Block, Borders, Paragraph},
 };
+use std::f64::consts::PI;
+use std::io::Write;
+use std::io::stdout;
+use std::thread::sleep;
+use std::time::{Duration, Instant};
 use yansi::{Color as YansiColor, Paint};
 
 #[derive(Debug, Clone, Copy)]
@@ -209,7 +210,7 @@ pub fn run_timer(
 
                     if position < progress_ratio {
                         let pulse_position = (position + pulse_offset) % 1.0;
-                        let brightness = (pulse_position * 3.14159).sin().abs();
+                        let brightness = (pulse_position * PI).sin().abs();
 
                         let color = if brightness > 0.7 {
                             YansiColor::BrightCyan
@@ -323,7 +324,7 @@ pub fn run_big_clock(duration: Duration, name: &str, bell: bool) -> std::io::Res
     let mut total_pause_duration = Duration::from_secs(0);
     loop {
         terminal.draw(|f| {
-            let size = f.size();
+            let size = f.area();
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .margin(2)
@@ -347,7 +348,7 @@ pub fn run_big_clock(duration: Duration, name: &str, bell: bool) -> std::io::Res
                         .add_modifier(Modifier::BOLD),
                 ));
             f.render_widget(block.clone(), timer_area);
-            let inner_area = timer_area.inner(&Margin {
+            let inner_area = timer_area.inner(Margin {
                 vertical: 1,
                 horizontal: 1,
             });

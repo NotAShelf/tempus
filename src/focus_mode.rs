@@ -3,16 +3,16 @@ use crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use std::io::stdout;
-use std::time::{Duration, Instant};
-use tui::{
+use ratatui::{
     Terminal,
     backend::CrosstermBackend,
     layout::{Alignment, Constraint, Direction, Layout, Margin},
     style::{Color, Modifier, Style},
-    text::{Span, Spans, Text},
+    text::{Line, Span, Text},
     widgets::{Block, Borders, Paragraph},
 };
+use std::io::stdout;
+use std::time::{Duration, Instant};
 
 use crate::utils::{format_simple_duration, send_notification, should_use_color};
 use crate::{ProgressBarTheme, Result};
@@ -115,11 +115,11 @@ impl FocusModeApp {
     }
 
     fn add_time(&mut self, amount: i64) {
-        if amount > 0 || self.duration > Duration::from_secs(amount.unsigned_abs() as u64) {
+        if amount > 0 || self.duration > Duration::from_secs(amount.unsigned_abs()) {
             if amount > 0 {
                 self.duration += Duration::from_secs(amount as u64);
             } else {
-                self.duration -= Duration::from_secs(amount.unsigned_abs() as u64);
+                self.duration -= Duration::from_secs(amount.unsigned_abs());
             }
         }
     }
@@ -205,7 +205,7 @@ pub fn run_focus_mode(
     res
 }
 
-fn run_app<B: tui::backend::Backend>(
+fn run_app<B: ratatui::backend::Backend>(
     terminal: &mut Terminal<B>,
     app: &mut FocusModeApp,
     tick_rate: Duration,
@@ -216,7 +216,7 @@ fn run_app<B: tui::backend::Backend>(
 
     loop {
         terminal.draw(|f| {
-            let size = f.size();
+            let size = f.area();
 
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
@@ -249,7 +249,7 @@ fn run_app<B: tui::backend::Backend>(
 
             f.render_widget(block.clone(), timer_area);
 
-            let inner_area = timer_area.inner(&Margin {
+            let inner_area = timer_area.inner(Margin {
                 vertical: 1,
                 horizontal: 1,
             });
@@ -301,7 +301,7 @@ fn run_app<B: tui::backend::Backend>(
                     bar_spans.push(Span::raw(" "));
                 }
             }
-            let bar_paragraph = Paragraph::new(Text::from(vec![Spans::from(bar_spans)]))
+            let bar_paragraph = Paragraph::new(Text::from(vec![Line::from(bar_spans)]))
                 .alignment(Alignment::Left);
             f.render_widget(bar_paragraph, inner_chunks[1]);
 
@@ -373,7 +373,7 @@ fn run_app<B: tui::backend::Backend>(
             }
 
             terminal.draw(|f| {
-                let size = f.size();
+                let size = f.area();
 
                 let chunks = Layout::default()
                     .direction(Direction::Vertical)
@@ -389,13 +389,13 @@ fn run_app<B: tui::backend::Backend>(
                     .split(size);
 
                 let completion_text = vec![
-                    Spans::from(Span::styled(
+                    Line::from(Span::styled(
                         format!("{} completed!", app.name),
                         Style::default()
                             .fg(Color::Green)
                             .add_modifier(Modifier::BOLD),
                     )),
-                    Spans::from(Span::styled(
+                    Line::from(Span::styled(
                         "Press any key to exit",
                         Style::default().fg(Color::DarkGray),
                     )),
