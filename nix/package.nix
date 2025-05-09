@@ -6,7 +6,7 @@
 in
   rustPlatform.buildRustPackage {
     pname = "tempus";
-    version = "0.3.4";
+    version = "0.3.5";
 
     src = fs.toSource {
       root = ../.;
