@@ -100,7 +100,7 @@ impl FocusModeApp {
                         colorgrad::Color::new(1.0, 0.0, 0.0, 1.0), // Red
                     ])
                     .build()
-                    .unwrap();
+                    .expect("Failed to build gradient");
                 let color = gradient.at(progress as f32).to_rgba8();
                 Color::Rgb(color[0], color[1], color[2])
             }

@@ -112,50 +112,76 @@ fn parse_datetime(datetime: &str) -> Result<DateTime<Local>> {
         .map(|dt| dt.with_timezone(&Local))
         .or_else(|_| {
             NaiveDateTime::parse_from_str(datetime, "%Y-%m-%d %H:%M:%S")
-                .map(|ndt| Local.from_local_datetime(&ndt).single().unwrap())
+                .map_err(|_| TempusError::InvalidDateTime(datetime.to_string()))
+                .and_then(|ndt| {
+                    Local.from_local_datetime(&ndt)
+                        .single()
+                        .ok_or_else(|| TempusError::InvalidDateTime(datetime.to_string()))
+                })
         })
         .or_else(|_| {
             NaiveDateTime::parse_from_str(datetime, "%Y-%m-%d %H:%M")
-                .map(|ndt| Local.from_local_datetime(&ndt).single().unwrap())
+                .map_err(|_| TempusError::InvalidDateTime(datetime.to_string()))
+                .and_then(|ndt| {
+                    Local.from_local_datetime(&ndt)
+                        .single()
+                        .ok_or_else(|| TempusError::InvalidDateTime(datetime.to_string()))
+                })
         })
         .or_else(|_| {
             NaiveDate::parse_from_str(datetime, "%Y-%m-%d")
-                .map(|nd| nd.and_hms_opt(0, 0, 0).unwrap())
-                .map(|ndt| Local.from_local_datetime(&ndt).single().unwrap())
+                .map_err(|_| TempusError::InvalidDateTime(datetime.to_string()))
+                .and_then(|nd| {
+                    nd.and_hms_opt(0, 0, 0)
+                        .ok_or_else(|| TempusError::InvalidDateTime(datetime.to_string()))
+                })
+                .and_then(|ndt| {
+                    Local.from_local_datetime(&ndt)
+                        .single()
+                        .ok_or_else(|| TempusError::InvalidDateTime(datetime.to_string()))
+                })
         })
         .or_else(|_| {
-            NaiveTime::parse_from_str(datetime, "%H:%M:%S").map(|nt| {
-                let now = Local::now();
-                let today = now.date_naive();
-                let ndt = today.and_time(nt);
-                let dt = Local.from_local_datetime(&ndt).single().unwrap();
-
-                // If the time is in the past, set it for tomorrow
-                if dt <= now {
-                    let tomorrow = today.succ_opt().unwrap();
-                    let ndt_tomorrow = tomorrow.and_time(nt);
-                    Local.from_local_datetime(&ndt_tomorrow).single().unwrap()
-                } else {
-                    dt
-                }
-            })
+            NaiveTime::parse_from_str(datetime, "%H:%M:%S")
+                .map_err(|_| TempusError::InvalidDateTime(datetime.to_string()))
+                .and_then(|nt| {
+                    let now = Local::now();
+                    let today = now.date_naive();
+                    let ndt = today.and_time(nt);
+                    let dt = Local.from_local_datetime(&ndt)
+                        .single()
+                        .ok_or_else(|| TempusError::InvalidDateTime(datetime.to_string()))?;
+                    if dt <= now {
+                        let tomorrow = today.succ_opt().ok_or_else(|| TempusError::InvalidDateTime(datetime.to_string()))?;
+                        let ndt_tomorrow = tomorrow.and_time(nt);
+                        Local.from_local_datetime(&ndt_tomorrow)
+                            .single()
+                            .ok_or_else(|| TempusError::InvalidDateTime(datetime.to_string()))
+                    } else {
+                        Ok(dt)
+                    }
+                })
         })
         .or_else(|_| {
-            NaiveTime::parse_from_str(datetime, "%H:%M").map(|nt| {
-                let now = Local::now();
-                let today = now.date_naive();
-                let ndt = today.and_time(nt);
-                let dt = Local.from_local_datetime(&ndt).single().unwrap();
-
-                // If the time is in the past, set it for tomorrow
-                if dt <= now {
-                    let tomorrow = today.succ_opt().unwrap();
-                    let ndt_tomorrow = tomorrow.and_time(nt);
-                    Local.from_local_datetime(&ndt_tomorrow).single().unwrap()
-                } else {
-                    dt
-                }
-            })
+            NaiveTime::parse_from_str(datetime, "%H:%M")
+                .map_err(|_| TempusError::InvalidDateTime(datetime.to_string()))
+                .and_then(|nt| {
+                    let now = Local::now();
+                    let today = now.date_naive();
+                    let ndt = today.and_time(nt);
+                    let dt = Local.from_local_datetime(&ndt)
+                        .single()
+                        .ok_or_else(|| TempusError::InvalidDateTime(datetime.to_string()))?;
+                    if dt <= now {
+                        let tomorrow = today.succ_opt().ok_or_else(|| TempusError::InvalidDateTime(datetime.to_string()))?;
+                        let ndt_tomorrow = tomorrow.and_time(nt);
+                        Local.from_local_datetime(&ndt_tomorrow)
+                            .single()
+                            .ok_or_else(|| TempusError::InvalidDateTime(datetime.to_string()))
+                    } else {
+                        Ok(dt)
+                    }
+                })
         })
         .map_err(|_| TempusError::InvalidDateTime(datetime.to_string()))
 }
