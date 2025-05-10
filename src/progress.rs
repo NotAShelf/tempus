@@ -186,7 +186,9 @@ pub fn run_timer(
                         let color = gradient.at(rel_pos as f32).to_rgba8();
                         let yansi_color = YansiColor::Rgb(color[0], color[1], color[2]);
                         print!("{}", Paint::new(PROGRESS_CHARS[7]).fg(yansi_color));
-                    } else if i == (progress_ratio * bar_width as f64) as usize && progress_ratio < 1.0 {
+                    } else if i == (progress_ratio * bar_width as f64) as usize
+                        && progress_ratio < 1.0
+                    {
                         let partial = (progress_ratio * bar_width as f64)
                             - (progress_ratio * bar_width as f64).floor();
                         let idx = (partial * (PROGRESS_CHARS.len() - 1) as f64).floor() as usize;

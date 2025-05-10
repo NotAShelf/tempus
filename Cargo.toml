@@ -7,7 +7,7 @@ description = "Simple, portable and tiny terminal timer utility"
 homepage = "https://github.com/notashelf/tempus"
 repository = "https://github.com/notashelf/tempus"
 readme = "README.md"
-authors = ["Race604 <raf@notashelf.dev>"]
+authors = ["NotAShelf <raf@notashelf.dev>"]
 
 
 [dependencies]
@@ -25,6 +25,7 @@ ratatui = "0.29.0"
 crossterm = "0.29"
 yansi = "1.0.1"
 chrono = { version = "0.4", features = ["clock", "serde"] }
+colorgrad = "0.7.1"
 
 [profile.release]
 opt-level = 3

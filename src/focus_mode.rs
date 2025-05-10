@@ -1,3 +1,5 @@
+use colorgrad;
+use colorgrad::Gradient;
 use crossterm::{
     event::{self, Event, KeyCode},
     execute,
@@ -13,8 +15,6 @@ use ratatui::{
 };
 use std::io::stdout;
 use std::time::{Duration, Instant};
-use colorgrad;
-use colorgrad::Gradient;
 
 use crate::utils::{format_simple_duration, send_notification, should_use_color};
 use crate::{ProgressBarTheme, Result};
